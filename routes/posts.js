@@ -87,7 +87,6 @@ router.get('/',async (req,res) => {
                 posts
             }
         });
-
     }catch (e){
         console.log(e);
         res.status(500).json({
