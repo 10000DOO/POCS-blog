@@ -5,46 +5,36 @@ const DB = require("../common/database");
 const dayjs = require('dayjs');
 
 //공지사항 추가
-router.post('/', async (req,res,next) =>{
+router.post('/', async (req,res) =>{
     const user_id = Number(req.body.user_id);
+    const title = JSON.stringify(req.body.title);
+    const content = JSON.stringify(req.body.content);
+    const category = JSON.stringify(req.body.category);
     try{
-        const user = await DB.execute({
+        const userDB = await DB.execute({
             psmt: `select type from USER where user_id = ?`,
             binding: [user_id]
         });
 
-        if(user[0].type == null){
+        if(userDB[0].type == null){
             res.status(404).json({
                 message: "권한이 없습니다.",
                 servertime: new Date()
             });
+        }else if(userDB[0].type == "primary"){
+            const postDB = await DB.execute({
+                psmt: `insert into POST (title, content, user_id, created_at, category) VALUES(?,?,?,NOW(),?)`,
+                binding: [title,content,user_id,category]
+            });
+
+            res.status(201).json({
+                message: "공지사항 추가 완료",
+                servertime: new Date()
+            });
         }
-        next();
+
     }catch(e){
         console.error(e);
-        res.status(500).json({
-            message: "알 수 없는 오류가 발생했습니다.",
-            servertime: new Date()
-        });
-    }
-}, async (req,res) =>{
-    const title = JSON.stringify(req.body.title);
-    const content = JSON.stringify(req.body.content);
-    const user_id = Number(req.body.user_id);
-    const category = JSON.stringify(req.body.category);
-    try{
-        const post = await DB.execute({
-            psmt: `insert into POST (title, content, user_id, created_at, category) VALUES(?,?,?,NOW(),?)`,
-            binding: [title,content,user_id,category]
-        });
-
-        res.status(201).json({
-            message: "공지사항 추가 완료",
-            servertime: new Date()
-        });
-
-    } catch (e){
-        console.log(e);
         res.status(500).json({
             message: "알 수 없는 오류가 발생했습니다.",
             servertime: new Date()
@@ -56,7 +46,7 @@ router.post('/', async (req,res,next) =>{
 router.get('/',async (req,res) => {
     try{
         const postsDB = await DB.execute({
-            psmt: `select post_id, title, created_at, updated_at, category from POST`,
+            psmt: `select post_id, user_id, title, created_at, updated_at, category from POST`,
             binding: []
         });
 
@@ -72,6 +62,7 @@ router.get('/',async (req,res) => {
         for(let i in postsDB){
             let postsObj = new Object();
             postsObj.post_id = postsDB[i].post_id;
+            postsObj.user_id = postsDB[i].user_id;
             postsObj.title = postsDB[i].title;
             postsObj.created_at = dayjs(postsDB[i].created_at).format("YY-MM-DD HH:MM:SS");
             postsObj.updated_at = dayjs(postsDB[i].updated_at).format("YY-MM-DD HH:MM:SS");
@@ -87,6 +78,7 @@ router.get('/',async (req,res) => {
                 posts
             }
         });
+
     }catch (e){
         console.log(e);
         res.status(500).json({
@@ -97,8 +89,8 @@ router.get('/',async (req,res) => {
 })
 
 //공지사항 상세조회
-router.get('/:post_id', async (req,res) => {
-    const post_id = req.params.post_id;
+router.get('/detail', async (req,res) => {
+    const post_id = req.query.post_id;
     try{
         const [postDB] = await DB.execute({
             psmt: `select title, content, n.created_at, u.user_id, username, email, type from POST n, USER u WHERE u.user_id = n.user_id and post_id = ?`,
@@ -119,14 +111,14 @@ router.get('/:post_id', async (req,res) => {
             data: {
                 title: postDB.title,
                 content: postDB.content,
-                created_at: dayjs(postDB.created_at).format("YY-MM-DD"),
-                updated_at: dayjs(postDB.updated_at).format("YY-MM-DD"),
+                created_at: dayjs(postDB.created_at).format("YY-MM-DD HH:MM:SS"),
+                updated_at: dayjs(postDB.updated_at).format("YY-MM-DD HH:MM:SS"),
                 category: postDB.category,
                 user :{
                     user_id : postDB.user_id,
                     username : postDB.username,
                     email : postDB.email,
-                    type : postDB.type,
+                    type : postDB.type
                 }
             }
         });
@@ -141,47 +133,37 @@ router.get('/:post_id', async (req,res) => {
 })
 
 //공지사항 수정
-router.put('/:post_id/edit', async (req,res,next) =>{
+router.put('/edit', async (req,res,next) =>{
     const user_id = Number(req.body.user_id);
+    const title = JSON.stringify(req.body.title);
+    const content = JSON.stringify(req.body.content);
+    const category = JSON.stringify(req.body.category);
+    const post_id = Number(req.query.post_id);
     try{
-        const user = await DB.execute({
+        const userDB = await DB.execute({
             psmt: `select type from USER where user_id = ?`,
             binding: [user_id]
         });
 
-        if(user[0].type == null){
+        if(userDB[0].type == null){
             res.status(404).json({
                 message: "권한이 없습니다.",
                 servertime: new Date()
             });
+        }else if(userDB[0].type == "primary"){
+            const postDB = await DB.execute({
+                psmt: `update POST set title = ?, content = ?, category = ?, user_id = ?, updated_at = NOW() where post_id = ?`,
+                binding: [title,content,category,user_id,post_id]
+            });
+
+            res.status(201).json({
+                message: "공지사항 수정 완료",
+                servertime: new Date()
+            });
         }
-        next();
+
     }catch(e){
         console.error(e);
-        res.status(500).json({
-            message: "알 수 없는 오류가 발생했습니다.",
-            servertime: new Date()
-        });
-    }
-}, async (req,res) =>{
-    const title = JSON.stringify(req.body.title);
-    const content = JSON.stringify(req.body.content);
-    const category = JSON.stringify(req.body.category);
-    const post_id = Number(req.params.post_id);
-    const user_id = Number(req.body.user_id);
-    try{
-        const post = await DB.execute({
-            psmt: `update POST set title = ?, content = ?, category = ?, user_id = ?, updated_at = NOW() where post_id = ?`,
-            binding: [title,content,category,user_id,post_id]
-        });
-
-        res.status(201).json({
-            message: "공지사항 수정 완료",
-            servertime: new Date(),
-        });
-
-    } catch (e){
-        console.log(e);
         res.status(500).json({
             message: "알 수 없는 오류가 발생했습니다.",
             servertime: new Date()
@@ -190,44 +172,34 @@ router.put('/:post_id/edit', async (req,res,next) =>{
 })
 
 //공지사항 삭제
-router.put('/:post_id/delete', async (req,res,next) =>{
+router.put('/delete', async (req,res,next) =>{
     const user_id = Number(req.body.user_id);
+    const post_id = Number(req.query.post_id);
     try{
-        const user = await DB.execute({
+        const userDB = await DB.execute({
             psmt: `select type from USER where user_id = ?`,
             binding: [user_id]
         });
 
-        if(user[0].type == null){
+        if(userDB[0].type == null){
             res.status(404).json({
                 message: "권한이 없습니다.",
                 servertime: new Date()
             });
+        }else if(userDB[0].type == "primary"){
+            const postDB = await DB.execute({
+                psmt: `update POST set canceled_at = NOW() where post_id = ?`,
+                binding: [post_id]
+            });
+
+            res.status(201).json({
+                message: "공지사항 삭제 완료",
+                servertime: new Date()
+            });
         }
-        next();
+
     }catch(e){
         console.error(e);
-        res.status(500).json({
-            message: "알 수 없는 오류가 발생했습니다.",
-            servertime: new Date()
-        });
-    }
-}, async (req,res) =>{
-    const post_id = Number(req.params.post_id);
-    const user_id = Number(req.body.user_id);
-    try{
-        const post = await DB.execute({
-            psmt: `update POST set canceled_at = NOW() where post_id = ?`,
-            binding: [post_id]
-        });
-
-        res.status(201).json({
-            message: "공지사항 삭제 완료",
-            servertime: new Date(),
-        });
-
-    } catch (e){
-        console.log(e);
         res.status(500).json({
             message: "알 수 없는 오류가 발생했습니다.",
             servertime: new Date()
